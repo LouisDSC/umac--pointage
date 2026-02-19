@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pointage Gabon Entreprise</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#2c3e50">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Pointage Employés UMAC</h1>
+        <p>Enregistrez votre arrivée en un clic.</p>
+
+        <div id="horloge-container">
+            <p>Heure actuelle:</p>
+            <div id="horloge">00:00:00</div>
+        </div>
+
+        <form id="pointageForm">
+            <label for="nom">Nom complet :</label>
+            <input type="text" id="nom" placeholder="Ex: Jean Marc" required>
+
+            <div class="gps-box">
+                <button type="button" onclick="obtenirLocation()" id="btnGps">
+                    📍 Vérifier ma position
+                </button>
+                <p id="status">Position non vérifiée</p>
+            </div>
+
+            <input type="hidden" id="lat">
+            <input type="hidden" id="long">
+
+            <button type="submit" id="btnValider" disabled>Valider l'arrivée</button>
+        </form>
+    </div>
+
+    <script>
+        /* 1. GESTION DE L'HORLOGE EN TEMPS RÉEL */
+        function rafraichirHorloge() {
+            const horlogeElement = document.getElementById('horloge');
+            const maintenant = new Date();
+
+            const heures = String(maintenant.getHours()).padStart(2, '0');
+            const minutes = String(maintenant.getMinutes()).padStart(2, '0');
+            const secondes = String(maintenant.getSeconds()).padStart(2, '0');
+
+            horlogeElement.textContent = `${heures}:${minutes}:${secondes}`;
+        }
+        // Lance l'horloge et la met à jour toutes les secondes
+        setInterval(rafraichirHorloge, 1000);
+        rafraichirHorloge();
+
+
+        /* 2. GESTION DE LA GÉOLOCALISATION */
+        function obtenirLocation() {
+            const status = document.getElementById('status');
+            const btnValider = document.getElementById('btnValider');
+
+            if (!navigator.geolocation) {
+                status.textContent = "La géolocalisation n'est pas supportée";
+            } else {
+                status.textContent = "Recherche GPS en cours...";
+                navigator.geolocation.getCurrentPosition(success, error);
+            }
+
+            function success(position) {
+                // On remplit les champs cachés avec les coordonnées
+                document.getElementById('lat').value = position.coords.latitude;
+                document.getElementById('long').value = position.coords.longitude;
+                
+                status.textContent = "✅ Position capturée !";
+                status.style.color = "green";
+                btnValider.disabled = false; // Active le bouton "Valider"
+            }
+
+            function error() {
+                status.textContent = "❌ Erreur : Activez votre GPS";
+                status.style.color = "red";
+            }
+        }
+
+
+        /* 3. ENVOI DES DONNÉES AU SERVEUR PYTHON (FLASK) */
+        const form = document.getElementById('pointageForm');
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault(); // Empêche la page de se recharger
+
+            // On prépare l'objet avec les données du formulaire
+            const donnees = {
+                nom: document.getElementById('nom').value,
+                lat: document.getElementById('lat').value,
+                long: document.getElementById('long').value
+            };
+
+            // On envoie ces données à la route '/pointer' de notre fichier app.py
+            fetch('/pointer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(donnees),
+            })
+            .then(response => response.json())
+            .then(result => {
+                // Si Python répond avec succès
+                alert(result.message);
+                form.reset(); // On vide le champ Nom
+                document.getElementById('status').textContent = "Position non vérifiée";
+                document.getElementById('status').style.color = "#7f8c8d";
+                document.getElementById('btnValider').disabled = true;
+            })
+            .catch((error) => {
+                console.error('Erreur:', error);
+                alert("Erreur de connexion avec le serveur.");
+            });
+        });
+    </script>
+    <script src="{{ url_for('static', filename='funcion.js') }}"></script>
+</body>
+</html>
